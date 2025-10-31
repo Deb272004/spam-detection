@@ -5,6 +5,8 @@ from sklearn.metrics import accuracy_score,precision_score,recall_score,roc_auc_
 import json
 import logging
 import pickle
+import yaml
+from dvclive import Live
 
 log_dir = 'log'
 os.makedirs(log_dir,exist_ok=True)
@@ -26,6 +28,22 @@ file_handler.setFormatter(fomatter)
 
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
+
+def load_params(file_path : str)->dict:
+    try:
+        with open(file_path,'r') as file:
+            params = yaml.safe_load(file)
+        logger.debug("parameters recieved from %s",file_path)
+        return params
+    except FileNotFoundError as e:
+        logger.error("file not fount at the location : %s",file_path)
+        raise
+    except yaml.error.YAMLError as e:
+        logger.error("yaml error: %s",e)
+        raise
+    except Exception as e:
+        logger.error("unexpected error occured while loading parameters %s", e)
+        raise
 
 
 
@@ -61,6 +79,7 @@ def load_data(file_path : str)->pd.DataFrame:
 
 def evaluate_model(clf, x_test : np.ndarray, y_test : np.ndarray) -> dict:
     try:
+        
         y_pred = clf.predict(x_test)
         y_pred_proba = clf.predict_proba(x_test)[:, 1]
 
@@ -98,6 +117,7 @@ def save_metrices(metrices:dict,file_path : str)->None:
 
 def main():
     try:
+        params = load_params(file_path="params.yaml")
         clf = load_model("./model/model.pkl")
         test_data = load_data("./data/processed/test_tfidf.csv")
 
@@ -105,6 +125,13 @@ def main():
         y_test = test_data.iloc[:,-1].values
 
         metrices = evaluate_model(clf, x_test,y_test)
+
+        with Live(save_dvc_exp=True) as live:
+            live.log_metric('accuracy_scroe : ',accuracy_score(y_test,y_test))
+            live.log_metric('precision_score : ',precision_score(y_test,y_test))
+            live.log_metric('recall_score : ',recall_score(y_test,y_test))
+
+            live.log_params(params)
 
         save_metrices(metrices, "reports/metrices.json")
 
