@@ -1,0 +1,4 @@
+[core]
+    remote = dvcstores
+['remote "dvcstores"']
+    url = s3://amzn-s3-pipeline
